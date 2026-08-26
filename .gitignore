@@ -16,6 +16,7 @@ local.properties
 
 # Android
 captures/
+app/src/main/assets/generated/
 
 # Kotlin / Java
 .kotlin/
