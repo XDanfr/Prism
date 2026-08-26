@@ -1,4 +1,3 @@
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.tasks.Copy
 
 plugins {
@@ -46,6 +45,14 @@ android {
             excludes += "/META-INF/NOTICE.md"
         }
     }
+
+    // AGP 9 rejects Provider instances passed to the legacy source-set API.
+    // Resolve the generated asset directory to a File once, then register it
+    // as a normal asset source. The task dependency below ensures the APK is
+    // present before Android merges the assets.
+    sourceSets["main"].assets.srcDir(
+        layout.buildDirectory.dir("generated/prismTemplateAssets").get().asFile
+    )
 }
 
 val prepareWebTemplate by tasks.registering(Copy::class) {
@@ -53,19 +60,9 @@ val prepareWebTemplate by tasks.registering(Copy::class) {
     from(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
     }
-    into(layout.buildDirectory.dir("generated/prismTemplateAssets"))
-    eachFile {
-        path = "generated/base-release.apk"
-    }
+    into(layout.buildDirectory.dir("generated/prismTemplateAssets/generated"))
+    rename { "base-release.apk" }
     includeEmptyDirs = false
-}
-
-extensions.configure<ApplicationAndroidComponentsExtension> {
-    onVariants { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(prepareWebTemplate) {
-            it.destinationDirectory
-        }
-    }
 }
 
 tasks.matching { it.name.matches(Regex("merge[A-Z].*Assets")) }.configureEach {
