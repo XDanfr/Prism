@@ -1,5 +1,3 @@
-import org.gradle.api.tasks.Copy
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -47,28 +45,19 @@ android {
     }
 }
 
-val prepareWebTemplate by tasks.registering(Copy::class) {
+val prepareWebTemplate = tasks.register<PrepareWebTemplateTask>("prepareWebTemplate") {
     dependsOn(":webtemplate:assembleRelease")
-    from(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release")) {
-        include("*.apk")
+    inputDirectory.set(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release"))
+    outputDirectory.set(layout.buildDirectory.dir("generated/prismTemplateAssets"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            prepareWebTemplate,
+            PrepareWebTemplateTask::outputDirectory
+        )
     }
-    into(layout.projectDirectory.dir("src/main/assets/generated"))
-    rename { "base-release.apk" }
-    includeEmptyDirs = false
-}
-
-tasks.named("preBuild") {
-    dependsOn(prepareWebTemplate)
-}
-
-tasks.configureEach {
-    if (name == "generateDebugAssets" || name == "generateReleaseAssets") {
-        dependsOn(prepareWebTemplate)
-    }
-}
-
-tasks.matching { it.name.matches(Regex("merge[A-Z].*Assets")) }.configureEach {
-    dependsOn(prepareWebTemplate)
 }
 
 dependencies {
