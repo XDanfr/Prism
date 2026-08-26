@@ -19,12 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Svg
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -35,12 +36,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,9 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import me.xdan.prism.model.AccentSource
@@ -117,7 +116,7 @@ fun CreateScreen(
     val faviconUrl = remember(url) {
         runCatching {
             val parsed = URI(url)
-            if (parsed.scheme != "http" && parsed.scheme != "https") null
+            if (parsed.scheme != "http" && parsed.scheme != "https" || parsed.host.isNullOrBlank()) null
             else "${parsed.scheme}://${parsed.host}/favicon.ico"
         }.getOrNull()
     }
@@ -131,7 +130,6 @@ fun CreateScreen(
             Text("Create", style = MaterialTheme.typography.headlineMedium)
             Text("Make a website feel like an app.", style = MaterialTheme.typography.bodyLarge)
         }
-
         item {
             OutlinedTextField(
                 value = url,
@@ -151,7 +149,6 @@ fun CreateScreen(
                 shape = RoundedCornerShape(24.dp)
             )
         }
-
         item {
             OutlinedTextField(
                 value = appName,
@@ -162,7 +159,6 @@ fun CreateScreen(
                 shape = RoundedCornerShape(24.dp)
             )
         }
-
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -182,7 +178,7 @@ fun CreateScreen(
                             Text(if (iconUri != null) "Custom icon selected" else if (faviconUrl != null) "Favicon suggestion" else "Globe fallback")
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = { svgPicker.launch("image/svg+xml") }) {
-                                    Icon(Icons.Default.Svg, contentDescription = null)
+                                    Icon(Icons.Default.Code, contentDescription = null)
                                     Text(" SVG")
                                 }
                                 OutlinedButton(onClick = { imagePicker.launch("image/*") }) {
@@ -192,43 +188,34 @@ fun CreateScreen(
                             }
                         }
                     }
-                    if (iconMime == "image/svg+xml") Text("SVG will be rendered into the adaptive and monochrome layers.", style = MaterialTheme.typography.bodySmall)
-                    else Text("PNG/JPEG images are used as the icon artwork. Prism will also generate the monochrome layer.", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (iconMime == "image/svg+xml") "SVG will be rendered into the adaptive and monochrome layers."
+                        else "PNG/JPEG images are used as the icon artwork. Prism will also generate the monochrome layer.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
-
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Accent colour", style = MaterialTheme.typography.titleLarge)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = accentSource == AccentSource.MATERIAL_YOU,
-                            onClick = { accentSource = AccentSource.MATERIAL_YOU },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2)
-                        ) { Text("Material You") }
-                        SegmentedButton(
-                            selected = accentSource == AccentSource.CUSTOM,
-                            onClick = { accentSource = AccentSource.CUSTOM },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2)
-                        ) { Text("Custom") }
+                        SegmentedButton(selected = accentSource == AccentSource.MATERIAL_YOU, onClick = { accentSource = AccentSource.MATERIAL_YOU }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Material You") }
+                        SegmentedButton(selected = accentSource == AccentSource.CUSTOM, onClick = { accentSource = AccentSource.CUSTOM }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Custom") }
                     }
                     if (accentSource == AccentSource.MATERIAL_YOU) {
                         Text("Uses the phone's current dynamic primary colour.", style = MaterialTheme.typography.bodySmall)
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             AccentChoices.forEach { choice ->
-                                Box(
-                                    modifier = Modifier.size(38.dp).clip(CircleShape).background(choice).clickable { accentColor = choice }.border(if (choice == accentColor) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                )
+                                Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(choice).clickable { accentColor = choice }.border(if (choice == accentColor) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape))
                             }
                         }
                     }
                 }
             }
         }
-
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -244,13 +231,7 @@ fun CreateScreen(
                         Switch(checked = sandboxed, onCheckedChange = { sandboxed = it })
                     }
                     if (!sandboxed) {
-                        OutlinedTextField(
-                            value = sharedProfileId.orEmpty(),
-                            onValueChange = { sharedProfileId = it.ifBlank { null } },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Shared profile name") },
-                            placeholder = { Text("default") }
-                        )
+                        OutlinedTextField(value = sharedProfileId.orEmpty(), onValueChange = { sharedProfileId = it.ifBlank { null } }, modifier = Modifier.fillMaxWidth(), label = { Text("Shared profile name") }, placeholder = { Text("default") })
                     }
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(selected = navMode == NavigationMode.WEB_VIEW, onClick = { navMode = NavigationMode.WEB_VIEW }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("WebView") }
@@ -259,7 +240,6 @@ fun CreateScreen(
                 }
             }
         }
-
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -281,7 +261,6 @@ fun CreateScreen(
                 }
             }
         }
-
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -292,18 +271,15 @@ fun CreateScreen(
                                 Text(option.title)
                                 Text(option.description, style = MaterialTheme.typography.bodySmall)
                             }
-                            Switch(
-                                checked = option.id in blocklists,
-                                onCheckedChange = { blocklists = if (option.id in blocklists) blocklists - option.id else blocklists + option.id }
-                            )
+                            Switch(checked = option.id in blocklists, onCheckedChange = { blocklists = if (option.id in blocklists) blocklists - option.id else blocklists + option.id })
                         }
                     }
                 }
             }
         }
-
         item {
             val packageName = PackageNameGenerator.forUrl(url)
+            val canBuild = (url.startsWith("http://") || url.startsWith("https://")) && appName.isNotBlank()
             Button(
                 onClick = {
                     val resolvedAccent = if (accentSource == AccentSource.CUSTOM) accentColor else MaterialTheme.colorScheme.primary
@@ -324,11 +300,9 @@ fun CreateScreen(
                         )
                     )
                 },
-                enabled = url.startsWith("http://") || url.startsWith("https://") && appName.isNotBlank(),
+                enabled = canBuild,
                 modifier = Modifier.fillMaxWidth().height(60.dp)
-            ) {
-                Text("Build app", style = MaterialTheme.typography.titleLarge)
-            }
+            ) { Text("Build app", style = MaterialTheme.typography.titleLarge) }
             Spacer(Modifier.height(24.dp))
         }
     }
