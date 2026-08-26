@@ -5,8 +5,10 @@
     android:viewportWidth="512"
     android:viewportHeight="512">
     <group
-        android:translateX="7"
-        android:translateY="25">
+        android:translateX="42"
+        android:translateY="60"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
         <!-- Prism Left Face -->
         <path
             android:fillColor="#6AAFA4"
