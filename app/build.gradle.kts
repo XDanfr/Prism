@@ -63,7 +63,7 @@ val prepareWebTemplate by tasks.registering(Copy::class) {
 extensions.configure<ApplicationAndroidComponentsExtension> {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(prepareWebTemplate) {
-            it.destinationDir
+            it.destinationDirectory
         }
     }
 }
