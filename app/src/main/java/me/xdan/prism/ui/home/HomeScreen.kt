@@ -1,7 +1,6 @@
 package me.xdan.prism.ui.home
 
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +22,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,8 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import me.xdan.prism.model.AppConfig
 import me.xdan.prism.util.AppConfigManager
@@ -50,6 +48,7 @@ data class PrismInstalledApp(
 
 @Composable
 fun HomeScreen(
+    refreshKey: Int,
     onCreate: () -> Unit,
     onConfigure: (AppConfig) -> Unit,
     modifier: Modifier = Modifier
@@ -77,7 +76,7 @@ fun HomeScreen(
             .toList()
     }
 
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(refreshKey) { refresh() }
 
     Column(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
         Row(
@@ -128,32 +127,18 @@ fun HomeScreen(
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(app.label, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    app.config?.targetUrl ?: app.packageName,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1
-                                )
+                                Text(app.config?.targetUrl ?: app.packageName, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                             }
                             IconButton(onClick = {
                                 packageManager.getLaunchIntentForPackage(app.packageName)?.let(context::startActivity)
-                            }) {
-                                Icon(Icons.Default.Web, contentDescription = "Open")
-                            }
-                            IconButton(onClick = {
-                                app.config?.let(onConfigure)
-                            }) {
+                            }) { Icon(Icons.Default.Web, contentDescription = "Open") }
+                            IconButton(onClick = { app.config?.let(onConfigure) }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Settings")
                             }
                             IconButton(onClick = {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_DELETE).apply {
-                                        data = Uri.parse("package:${app.packageName}")
-                                    }
-                                )
+                                context.startActivity(Intent(Intent.ACTION_DELETE).apply { data = Uri.parse("package:${app.packageName}") })
                                 refresh()
-                            }) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = "Uninstall")
-                            }
+                            }) { Icon(Icons.Default.DeleteOutline, contentDescription = "Uninstall") }
                         }
                     }
                 }
