@@ -86,7 +86,7 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
                     blocklistUrls = resolvedConfig.blocklistUrls
                 )
                 val result = compiler.compile(
-                    baseApkAssetPath = "generated/base-release.apk",
+                    baseApkAssetPath = "base-release.apk",
                     targetPackageName = resolvedConfig.packageName,
                     targetAppName = resolvedConfig.appName,
                     targetUrl = resolvedConfig.targetUrl,
