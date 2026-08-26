@@ -1,7 +1,6 @@
 package me.xdan.prism.ui
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -12,14 +11,15 @@ import kotlinx.coroutines.launch
 import me.xdan.prism.compiler.BinaryCompilerEngine
 import me.xdan.prism.compiler.IconPipeline
 import me.xdan.prism.model.AppConfig
-import me.xdan.prism.model.NavigationMode
+import me.xdan.prism.util.AppConfigManager
+import me.xdan.prism.util.PackageNameGenerator
 import java.io.File
 import java.io.FileOutputStream
 
 class CreateAppViewModel(application: Application) : AndroidViewModel(application) {
-
     private val compiler = BinaryCompilerEngine(application)
     private val context = application
+    private val configManager = AppConfigManager(application)
 
     private val _uiState = MutableStateFlow<CompilationProgress>(CompilationProgress.Idle)
     val uiState: StateFlow<CompilationProgress> = _uiState.asStateFlow()
@@ -31,44 +31,66 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun startCompilation(config: AppConfig) {
+        if (config.targetUrl.isBlank() || config.appName.isBlank()) return
+
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.value = CompilationProgress.Running("Initializing...", 0.1f)
-            
-            val iconInput = when {
-                config.iconUri != null -> {
-                    val file = File(context.cacheDir, "temp_icon_${System.currentTimeMillis()}")
-                    context.contentResolver.openInputStream(config.iconUri)?.use { input ->
-                        FileOutputStream(file).use { output ->
-                            input.copyTo(output)
+            runCatching {
+                _uiState.value = CompilationProgress.Running("Preparing app…", 0.1f)
+
+                val existingPackages = context.packageManager
+                    .getInstalledApplications(android.content.pm.PackageManager.MATCH_ALL)
+                    .asSequence()
+                    .map { it.packageName }
+                    .toSet()
+                val targetPackage = if (config.packageName.startsWith("me.xdan.prism.")) {
+                    PackageNameGenerator.ensureUnique(config.packageName, existingPackages::contains)
+                } else {
+                    PackageNameGenerator.ensureUnique(PackageNameGenerator.forUrl(config.targetUrl), existingPackages::contains)
+                }
+                val resolvedConfig = config.copy(packageName = targetPackage)
+
+                val iconInput = when {
+                    resolvedConfig.iconUri != null -> {
+                        val file = File(context.cacheDir, "temp_icon_${System.currentTimeMillis()}")
+                        context.contentResolver.openInputStream(resolvedConfig.iconUri)?.use { input ->
+                            FileOutputStream(file).use { output -> input.copyTo(output) }
+                        } ?: throw IllegalStateException("Unable to read selected icon")
+
+                        val mime = context.contentResolver.getType(resolvedConfig.iconUri)
+                        if (mime == "image/svg+xml" || resolvedConfig.iconUri.toString().contains(".svg", ignoreCase = true)) {
+                            IconPipeline.IconInput.Svg(file)
+                        } else {
+                            IconPipeline.IconInput.Png(file)
                         }
                     }
-                    if (config.iconUri.toString().endsWith(".svg")) {
-                        IconPipeline.IconInput.Svg(file)
-                    } else {
-                        IconPipeline.IconInput.Png(file)
-                    }
+                    else -> IconPipeline.IconInput.Url(resolvedConfig.targetUrl)
                 }
-                else -> IconPipeline.IconInput.Url(config.targetUrl)
-            }
 
-            _uiState.value = CompilationProgress.Running("Patching APK...", 0.4f)
-            
-            val hexColor = String.format("#%06X", 0xFFFFFF and config.accentColor)
-            
-            val result = compiler.compile(
-                baseApkAssetPath = "base-release.apk", // Assuming this exists in assets
-                targetPackageName = "me.prism.app.${System.currentTimeMillis()}",
-                targetAppName = config.appName,
-                targetUrl = config.targetUrl,
-                iconInput = iconInput,
-                iconBackgroundColor = hexColor
-            )
+                _uiState.value = CompilationProgress.Running("Patching APK…", 0.35f)
+                val hexColor = String.format("#%06X", 0xFFFFFF and resolvedConfig.accentColor)
+                val result = compiler.compile(
+                    baseApkAssetPath = "base-release.apk",
+                    targetPackageName = resolvedConfig.packageName,
+                    targetAppName = resolvedConfig.appName,
+                    targetUrl = resolvedConfig.targetUrl,
+                    iconInput = iconInput,
+                    iconBackgroundColor = hexColor,
+                    oldPackageHint = "me.xdan.prism.template"
+                )
 
-            if (result.success) {
-                _uiState.value = CompilationProgress.Finished(true, result.outputApk)
-            } else {
-                _uiState.value = CompilationProgress.Finished(false, error = result.error)
+                if (result.success) {
+                    configManager.saveConfig(resolvedConfig.packageName, resolvedConfig)
+                    _uiState.value = CompilationProgress.Finished(true, result.outputApk)
+                } else {
+                    _uiState.value = CompilationProgress.Finished(false, error = result.error)
+                }
+            }.onFailure { error ->
+                _uiState.value = CompilationProgress.Finished(false, error = error.message ?: error.toString())
             }
         }
+    }
+
+    fun reset() {
+        _uiState.value = CompilationProgress.Idle
     }
 }
