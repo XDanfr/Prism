@@ -57,6 +57,14 @@ val prepareWebTemplate by tasks.registering(Copy::class) {
     includeEmptyDirs = false
 }
 
+tasks.named("generateDebugAssets") {
+    dependsOn(prepareWebTemplate)
+}
+
+tasks.named("generateReleaseAssets") {
+    dependsOn(prepareWebTemplate)
+}
+
 tasks.named("preBuild") {
     dependsOn(prepareWebTemplate)
 }
