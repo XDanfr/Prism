@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:translateX="7"
+        android:translateY="25">
+        <!-- Prism Left Face -->
+        <path
+            android:fillColor="#000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineJoin="round"
+            android:pathData="M170,100 L60,310 L190,360 Z" />
+        <!-- Prism Right Face -->
+        <path
+            android:fillColor="#000000"
+            android:fillAlpha="0.5"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineJoin="round"
+            android:pathData="M170,100 L190,360 L300,290 Z" />
+
+        <!-- Globe Wireframe -->
+        <group
+            android:strokeColor="#000000"
+            android:strokeWidth="2.5"
+            android:strokeLineCap="round">
+            <!-- Latitudes -->
+            <path android:pathData="M131.5,173.5 Q160,195 177,191" />
+            <path android:pathData="M177,191 Q195,185 215.5,166.5" />
+            <path android:pathData="M104,226 Q150,265 182,256" />
+            <path android:pathData="M182,256 Q220,240 248,214" />
+            <path android:pathData="M76.5,278.5 Q140,335 187,321" />
+            <path android:pathData="M187,321 Q240,300 280.5,261.5" />
+            <!-- Longitudes -->
+            <path android:pathData="M170,100 Q120,200 103,326.5" />
+            <path android:pathData="M170,100 Q150,220 146,343" />
+            <path android:pathData="M170,100 Q200,230 226,337" />
+            <path android:pathData="M170,100 Q240,210 263,314" />
+        </group>
+
+        <!-- Origin Light -->
+        <path
+            android:fillColor="#000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="1.5"
+            android:strokeLineJoin="round"
+            android:pathData="M175,230 L245,210 L273,250 Z" />
+
+        <!-- Beam Bands -->
+        <path
+            android:fillColor="#000000"
+            android:fillAlpha="0.7"
+            android:strokeColor="#000000"
+            android:strokeWidth="1.5"
+            android:strokeLineJoin="round"
+            android:pathData="M245,210 L370,180 L400,210 L252,220 Z" />
+        <path
+            android:fillColor="#000000"
+            android:fillAlpha="0.6"
+            android:strokeColor="#000000"
+            android:strokeWidth="1.5"
+            android:strokeLineJoin="round"
+            android:pathData="M252,220 L400,210 L430,240 L259,230 Z" />
+        <path
+            android:fillColor="#000000"
+            android:fillAlpha="0.5"
+            android:strokeColor="#000000"
+            android:strokeWidth="1.5"
+            android:strokeLineJoin="round"
+            android:pathData="M259,230 L430,240 L405,267.5 L266,240 Z" />
+        <path
+            android:fillColor="#000000"
+            android:fillAlpha="0.4"
+            android:strokeColor="#000000"
+            android:strokeWidth="1.5"
+            android:strokeLineJoin="round"
+            android:pathData="M266,240 L405,267.5 L380,295 L273,250 Z" />
+
+        <!-- Beam End Cap -->
+        <path
+            android:strokeColor="#000000"
+            android:strokeWidth="16"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M370,180 L430,240 L380,295" />
+    </group>
+</vector>

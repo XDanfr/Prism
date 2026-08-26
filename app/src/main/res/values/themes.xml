@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.Prism" parent="Theme.MaterialComponents.Light" />
+</resources>
