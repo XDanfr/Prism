@@ -1,9 +1,5 @@
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
-import org.gradle.api.DefaultTask
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.TaskAction
-import java.io.File
+import org.gradle.api.tasks.Copy
 
 plugins {
     alias(libs.plugins.android.application)
@@ -52,43 +48,22 @@ android {
     }
 }
 
-abstract class PrepareWebTemplateTask : DefaultTask() {
-    @get:OutputDirectory
-    abstract val outputDirectory: DirectoryProperty
-
-    @TaskAction
-    fun copyTemplate() {
-        val sourceApk = project(":webtemplate")
-            .layout.buildDirectory
-            .dir("outputs/apk/release")
-            .get()
-            .asFile
-            .resolve("webtemplate-release.apk")
-            .takeIf { it.exists() }
-            ?: project(":webtemplate")
-                .layout.buildDirectory
-                .dir("outputs/apk/release")
-                .get()
-                .asFile
-                .listFiles()
-                ?.firstOrNull { it.extension == "apk" }
-            ?: error("webtemplate release APK was not produced")
-
-        val target = outputDirectory.get().asFile.resolve("generated/base-release.apk")
-        target.parentFile.mkdirs()
-        sourceApk.copyTo(target, overwrite = true)
-    }
-}
-
-val prepareWebTemplate = tasks.register<PrepareWebTemplateTask>("prepareWebTemplate") {
+val prepareWebTemplate by tasks.registering(Copy::class) {
     dependsOn(":webtemplate:assembleRelease")
-    outputDirectory.set(layout.buildDirectory.dir("generated/prismTemplateAssets"))
+    from(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release")) {
+        include("*.apk")
+    }
+    into(layout.buildDirectory.dir("generated/prismTemplateAssets"))
+    eachFile {
+        path = "generated/base-release.apk"
+    }
+    includeEmptyDirs = false
 }
 
 extensions.configure<ApplicationAndroidComponentsExtension> {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(prepareWebTemplate) {
-            it.outputDirectory
+            it.destinationDir
         }
     }
 }
