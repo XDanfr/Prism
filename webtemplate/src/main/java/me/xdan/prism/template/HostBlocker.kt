@@ -10,9 +10,9 @@ import java.util.concurrent.ConcurrentHashMap
 class HostBlocker {
     private val blockedHosts = ConcurrentHashMap.newKeySet<String>()
 
-    fun loadAsync(sourceIds: Set<String>) {
+    fun loadAsync(sourceIds: Set<String>, customUrls: List<String>) {
         Thread {
-            sourceIds.flatMap(::urlsFor).forEach { url ->
+            (sourceIds.flatMap(::urlsFor) + customUrls).distinct().forEach { url ->
                 runCatching { downloadHosts(url).forEach(blockedHosts::add) }
             }
         }.start()
@@ -20,18 +20,11 @@ class HostBlocker {
 
     fun shouldBlock(request: WebResourceRequest): Boolean {
         val host = request.url.host?.lowercase() ?: return false
-        return blockedHosts.any { blocked ->
-            host == blocked || host.endsWith(".$blocked")
-        }
+        return blockedHosts.any { blocked -> host == blocked || host.endsWith(".$blocked") }
     }
 
     fun emptyResponse(): WebResourceResponse = WebResourceResponse(
-        "text/plain",
-        "UTF-8",
-        204,
-        "No Content",
-        emptyMap(),
-        ByteArrayInputStream(ByteArray(0))
+        "text/plain", "UTF-8", 204, "No Content", emptyMap(), ByteArrayInputStream(ByteArray(0))
     )
 
     private fun urlsFor(id: String): List<String> = when (id) {
@@ -49,9 +42,7 @@ class HostBlocker {
         connection.setRequestProperty("User-Agent", "PrismWebApp/1.0")
         return try {
             if (connection.responseCode !in 200..299) return emptySet()
-            connection.inputStream.bufferedReader().useLines { lines ->
-                lines.mapNotNull(::parseHost).toSet()
-            }
+            connection.inputStream.bufferedReader().useLines { lines -> lines.mapNotNull(::parseHost).toSet() }
         } finally {
             connection.disconnect()
         }
