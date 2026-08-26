@@ -268,9 +268,10 @@ fun CreateScreen(
         item {
             val packageName = PackageNameGenerator.forUrl(url)
             val canBuild = (url.startsWith("http://") || url.startsWith("https://")) && appName.isNotBlank()
+            val materialYouAccent = MaterialTheme.colorScheme.primary
             Button(
                 onClick = {
-                    val resolvedAccent = if (accentSource == AccentSource.CUSTOM) accentColor else MaterialTheme.colorScheme.primary
+                    val resolvedAccent = if (accentSource == AccentSource.CUSTOM) accentColor else materialYouAccent
                     onGenerate(AppConfig(
                         packageName = packageName,
                         targetUrl = url.trim(),
