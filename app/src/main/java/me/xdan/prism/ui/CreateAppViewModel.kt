@@ -37,11 +37,9 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun startCompilation(config: AppConfig) {
         if (config.targetUrl.isBlank() || config.appName.isBlank()) return
-
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 _uiState.value = CompilationProgress.Running("Preparing app…", 0.1f)
-
                 val existingPackages = context.packageManager
                     .getInstalledApplications(android.content.pm.PackageManager.MATCH_ALL)
                     .asSequence()
@@ -60,7 +58,6 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
                         context.contentResolver.openInputStream(resolvedConfig.iconUri)?.use { input ->
                             FileOutputStream(file).use { output -> input.copyTo(output) }
                         } ?: throw IllegalStateException("Unable to read selected icon")
-
                         val mime = context.contentResolver.getType(resolvedConfig.iconUri)
                         if (mime == "image/svg+xml" || resolvedConfig.iconUri.toString().contains(".svg", ignoreCase = true)) {
                             IconPipeline.IconInput.Svg(file)
@@ -84,21 +81,20 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
                     sandboxed = resolvedConfig.sandboxed,
                     sharedProfileId = resolvedConfig.sharedProfileId,
                     userScripts = resolvedConfig.userScripts,
-                    blocklists = resolvedConfig.blocklists
+                    userScriptUrls = resolvedConfig.userScriptUrls,
+                    blocklists = resolvedConfig.blocklists,
+                    blocklistUrls = resolvedConfig.blocklistUrls
                 )
-                val configJson = configAdapter.toJson(configDto)
-                val hexColor = String.format("#%06X", 0xFFFFFF and resolvedConfig.accentColor)
                 val result = compiler.compile(
                     baseApkAssetPath = "generated/base-release.apk",
                     targetPackageName = resolvedConfig.packageName,
                     targetAppName = resolvedConfig.appName,
                     targetUrl = resolvedConfig.targetUrl,
                     iconInput = iconInput,
-                    iconBackgroundColor = hexColor,
-                    configJson = configJson,
+                    iconBackgroundColor = String.format("#%06X", 0xFFFFFF and resolvedConfig.accentColor),
+                    configJson = configAdapter.toJson(configDto),
                     oldPackageHint = "me.xdan.prism.template"
                 )
-
                 if (result.success) {
                     configManager.saveConfig(resolvedConfig.packageName, resolvedConfig)
                     _uiState.value = CompilationProgress.Finished(true, result.outputApk)
