@@ -11,11 +11,8 @@ import me.xdan.prism.model.NavigationMode
 import java.io.File
 
 class AppConfigManager(private val context: Context) {
-    private val moshi = Moshi.Builder()
-        .add(KotlinJsonAdapterFactory())
-        .build()
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val adapter = moshi.adapter(AppConfigDto::class.java)
-
     private val configDir = File(context.filesDir, "app_configs").apply { mkdirs() }
 
     fun saveConfig(packageName: String, config: AppConfig) {
@@ -32,7 +29,9 @@ class AppConfigManager(private val context: Context) {
             sandboxed = config.sandboxed,
             sharedProfileId = config.sharedProfileId,
             userScripts = config.userScripts,
-            blocklists = config.blocklists
+            userScriptUrls = config.userScriptUrls,
+            blocklists = config.blocklists,
+            blocklistUrls = config.blocklistUrls
         )
         File(configDir, "$safePackage.json").writeText(adapter.toJson(dto))
     }
@@ -51,14 +50,14 @@ class AppConfigManager(private val context: Context) {
                 iconUri = dto.iconUri?.let(Uri::parse),
                 faviconUrl = dto.faviconUrl,
                 accentColor = dto.accentColor,
-                accentSource = runCatching { AccentSource.valueOf(dto.accentSource) }
-                    .getOrDefault(AccentSource.MATERIAL_YOU),
-                navMode = runCatching { NavigationMode.valueOf(dto.navMode) }
-                    .getOrDefault(NavigationMode.WEB_VIEW),
+                accentSource = runCatching { AccentSource.valueOf(dto.accentSource) }.getOrDefault(AccentSource.MATERIAL_YOU),
+                navMode = runCatching { NavigationMode.valueOf(dto.navMode) }.getOrDefault(NavigationMode.WEB_VIEW),
                 sandboxed = dto.sandboxed,
                 sharedProfileId = dto.sharedProfileId,
                 userScripts = dto.userScripts,
-                blocklists = dto.blocklists
+                userScriptUrls = dto.userScriptUrls,
+                blocklists = dto.blocklists,
+                blocklistUrls = dto.blocklistUrls
             )
         }.getOrNull()
     }
@@ -88,5 +87,7 @@ data class AppConfigDto(
     val sandboxed: Boolean = true,
     val sharedProfileId: String? = null,
     val userScripts: List<String> = emptyList(),
-    val blocklists: List<String> = emptyList()
+    val userScriptUrls: List<String> = emptyList(),
+    val blocklists: List<String> = emptyList(),
+    val blocklistUrls: List<String> = emptyList()
 )
