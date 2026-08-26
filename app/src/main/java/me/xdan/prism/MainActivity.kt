@@ -18,11 +18,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,7 +39,6 @@ import me.xdan.prism.ui.settings.SettingsScreen
 import me.xdan.prism.ui.theme.PrismTheme
 import me.xdan.prism.util.AppConfigManager
 import me.xdan.prism.util.InstallManager
-import java.io.File
 
 private enum class PrismTab { HOME, CREATE, SETTINGS }
 
@@ -55,10 +52,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun PrismApp() {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val onboardingViewModel: OnboardingViewModel = viewModel()
     val onboardingCompleted by onboardingViewModel.isOnboardingCompleted.collectAsState(initial = false)
-
     if (!onboardingCompleted) {
         OnboardingScreen(onComplete = onboardingViewModel::completeOnboarding)
     } else {
@@ -76,7 +71,7 @@ private fun PrismShell() {
 
     var tab by rememberSaveable { mutableStateOf(PrismTab.HOME) }
     var selectedConfig by remember { mutableStateOf<AppConfig?>(null) }
-    var refreshToken by remember { mutableIntStateOf(0) }
+    var refreshToken by remember { mutableStateOf(0) }
     val compiling = compilationState !is CreateAppViewModel.CompilationProgress.Idle
 
     if (compiling) {
@@ -88,9 +83,7 @@ private fun PrismShell() {
                 me.xdan.prism.ui.result.ResultScreen(
                     success = state.success,
                     errorMessage = state.error,
-                    onInstall = {
-                        state.apkFile?.let(installManager::installApk)
-                    },
+                    onInstall = { state.apkFile?.let(installManager::installApk) },
                     onBack = {
                         createViewModel.reset()
                         refreshToken++
@@ -130,14 +123,13 @@ private fun PrismShell() {
     ) { innerPadding ->
         when (tab) {
             PrismTab.HOME -> HomeScreen(
+                refreshKey = refreshToken,
                 onCreate = { tab = PrismTab.CREATE },
                 onConfigure = { selectedConfig = it },
                 modifier = Modifier.padding(innerPadding)
             )
             PrismTab.CREATE -> CreateScreen(
-                onGenerate = {
-                    createViewModel.startCompilation(it)
-                },
+                onGenerate = createViewModel::startCompilation,
                 modifier = Modifier.padding(innerPadding)
             )
             PrismTab.SETTINGS -> SettingsScreen(modifier = Modifier.padding(innerPadding))
@@ -158,11 +150,7 @@ private fun PrismShell() {
 }
 
 @Composable
-private fun AppSettingsDialog(
-    config: AppConfig,
-    onDismiss: () -> Unit,
-    onSave: (AppConfig) -> Unit
-) {
+private fun AppSettingsDialog(config: AppConfig, onDismiss: () -> Unit, onSave: (AppConfig) -> Unit) {
     var sandboxed by remember(config.packageName) { mutableStateOf(config.sandboxed) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -180,9 +168,7 @@ private fun AppSettingsDialog(
                 Text("Blocklists: ${config.blocklists.size} enabled", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = {
-            Button(onClick = { onSave(config.copy(sandboxed = sandboxed)) }) { Text("Save") }
-        },
+        confirmButton = { Button(onClick = { onSave(config.copy(sandboxed = sandboxed)) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
