@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.coil.compose)
     implementation(libs.converter.moshi)
+    implementation(libs.moshi.kotlin)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.core)
@@ -104,4 +105,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.zip4j)
     implementation(libs.bouncycastle)
+    implementation(libs.bcpkix)
+    implementation(libs.apksig)
+    implementation(libs.androidsvg)
 }
