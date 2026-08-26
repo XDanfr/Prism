@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.Copy
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -8,13 +10,13 @@ plugins {
 android {
     namespace = "me.xdan.prism"
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "me.xdan.prism"
         minSdk = 24
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -43,6 +45,19 @@ android {
             excludes += "/META-INF/NOTICE.md"
         }
     }
+}
+
+val prepareWebTemplate by tasks.registering(Copy::class) {
+    dependsOn(":webtemplate:assembleRelease")
+    from(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release")) {
+        include("*.apk")
+    }
+    into(layout.projectDirectory.dir("src/main/assets/generated"))
+    rename { "base-release.apk" }
+}
+
+tasks.named("preBuild") {
+    dependsOn(prepareWebTemplate)
 }
 
 dependencies {
