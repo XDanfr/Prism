@@ -6,18 +6,15 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import com.caverock.androidsvg.SVG
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
 
-/**
- * Pipeline for generating adaptive icons for generated WebAPKs.
- */
+/** Generates icon resources for generated Prism WebAPKs. */
 class IconPipeline(private val context: Context) {
-
     private val client = OkHttpClient()
 
     sealed class IconInput {
@@ -26,82 +23,47 @@ class IconPipeline(private val context: Context) {
         data class Png(val file: File) : IconInput()
     }
 
-    /**
-     * Generates all necessary icon resources into the target directory.
-     * @param input The source icon (URL, SVG, or PNG)
-     * @param backgroundColor Hex color string (e.g., "#FFFFFF")
-     * @param targetResDir The extracted res directory of the APK
-     */
-    fun generateIcons(
-        input: IconInput,
-        backgroundColor: String,
-        targetResDir: File
-    ) {
-        val colorInt = try {
-            Color.parseColor(backgroundColor)
-        } catch (e: Exception) {
-            Color.WHITE
-        }
-
+    fun generateIcons(input: IconInput, backgroundColor: String, targetResDir: File) {
         val sourceBitmap = when (input) {
             is IconInput.Url -> fetchFavicon(input.url)
             is IconInput.Svg -> renderSvgToBitmap(input.file)
             is IconInput.Png -> BitmapFactory.decodeFile(input.file.absolutePath)
-        } ?: return
+        } ?: generateGlobeBitmap()
 
-        // Create directories
-        val drawableDir = File(targetResDir, "drawable")
-        drawableDir.mkdirs()
+        targetResDir.mkdirs()
+        val drawableDir = File(targetResDir, "drawable").apply { mkdirs() }
 
-        // 1. Generate legacy PNGs for various densities
         generateLegacyIcons(sourceBitmap, targetResDir)
-
-        // 2. Generate foreground layer (PNG)
-        val foregroundFile = File(drawableDir, "ic_launcher_foreground.png")
-        saveBitmap(sourceBitmap, foregroundFile)
-
-        // 3. Generate adaptive background (XML)
+        saveBitmap(sourceBitmap, File(drawableDir, "ic_launcher.png"))
+        saveBitmap(sourceBitmap, File(drawableDir, "ic_launcher_foreground.png"))
         generateBackground(backgroundColor, targetResDir)
-
-        // 4. Generate monochromatic layer
-        // We use a simplified monochromatic version of the source bitmap
         generateMonochrome(sourceBitmap, targetResDir)
-
-        // 5. Generate adaptive XML for API 26+
         generateAdaptiveXml(targetResDir)
     }
 
     private fun fetchFavicon(url: String): Bitmap? {
-        val faviconUrl = if (url.endsWith("/")) "${url}favicon.ico" else "$url/favicon.ico"
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+        val host = uri.host ?: return null
+        val faviconUrl = "${uri.scheme ?: "https"}://$host/favicon.ico"
         val request = Request.Builder().url(faviconUrl).build()
-        return try {
+        return runCatching {
             client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    response.body?.byteStream()?.let { BitmapFactory.decodeStream(it) }
-                } else null
+                if (response.isSuccessful) response.body?.byteStream()?.use(BitmapFactory::decodeStream) else null
             }
-        } catch (e: Exception) {
-            null
-        }
+        }.getOrNull()
     }
 
-    private fun renderSvgToBitmap(file: File): Bitmap? {
-        return try {
-            file.inputStream().use { inputStream ->
-                val svg = SVG.getFromInputStream(inputStream)
-                // Adaptive icons should have safe zones, so we might want to scale it
-                val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
-                svg.documentWidth = 512f
-                svg.documentHeight = 512f
-                svg.renderToCanvas(canvas)
-                bitmap
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
+    private fun renderSvgToBitmap(file: File): Bitmap? = runCatching {
+        file.inputStream().use { inputStream ->
+            val svg = SVG.getFromInputStream(inputStream)
+            val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            svg.documentWidth = 512f
+            svg.documentHeight = 512f
+            svg.renderToCanvas(canvas)
+            bitmap
         }
-    }
+    }.getOrNull()
 
     private fun generateLegacyIcons(bitmap: Bitmap, targetResDir: File) {
         val densities = mapOf(
@@ -111,10 +73,8 @@ class IconPipeline(private val context: Context) {
             "mipmap-xxhdpi" to 144,
             "mipmap-xxxhdpi" to 192
         )
-
         densities.forEach { (dir, size) ->
-            val dirFile = File(targetResDir, dir)
-            dirFile.mkdirs()
+            val dirFile = File(targetResDir, dir).apply { mkdirs() }
             val resized = Bitmap.createScaledBitmap(bitmap, size, size, true)
             saveBitmap(resized, File(dirFile, "ic_launcher.png"))
             saveBitmap(resized, File(dirFile, "ic_launcher_round.png"))
@@ -122,36 +82,36 @@ class IconPipeline(private val context: Context) {
     }
 
     private fun generateBackground(color: String, targetResDir: File) {
-        val xml = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <shape xmlns:android="http://schemas.android.com/apk/res/android"
-                android:shape="rectangle">
-                <solid android:color="$color" />
-            </shape>
-        """.trimIndent()
-        File(targetResDir, "drawable/ic_launcher_background.xml").writeText(xml)
+        val safeColor = runCatching { Color.parseColor(color) }.getOrElse { Color.DKGRAY }
+        val normalized = String.format("#%08X", safeColor)
+        File(targetResDir, "drawable/ic_launcher_background.xml").apply {
+            parentFile?.mkdirs()
+            writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+                    <solid android:color="$normalized" />
+                </shape>
+                """.trimIndent()
+            )
+        }
     }
 
     private fun generateMonochrome(bitmap: Bitmap, targetResDir: File) {
-        // Create a monochromatic version by using the alpha channel and making it solid black
-        // This allows Android 13+ to apply dynamic color tinting effectively.
-        val width = bitmap.width
-        val height = bitmap.height
-        val monoBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(monoBitmap)
-        val paint = Paint()
-        
-        // ColorMatrix to extract alpha and set RGB to black (0,0,0)
-        val cm = android.graphics.ColorMatrix(floatArrayOf(
-            0f, 0f, 0f, 0f, 0f,
-            0f, 0f, 0f, 0f, 0f,
-            0f, 0f, 0f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f
-        ))
-        paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
+        val mono = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(mono)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            colorFilter = android.graphics.ColorMatrixColorFilter(
+                android.graphics.ColorMatrix(floatArrayOf(
+                    0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f
+                ))
+            )
+        }
         canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        
-        saveBitmap(monoBitmap, File(targetResDir, "drawable/ic_launcher_monochrome.png"))
+        saveBitmap(mono, File(targetResDir, "drawable/ic_launcher_monochrome.png"))
     }
 
     private fun generateAdaptiveXml(targetResDir: File) {
@@ -163,14 +123,29 @@ class IconPipeline(private val context: Context) {
                 <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
             </adaptive-icon>
         """.trimIndent()
-        
-        val anyDpiDir = File(targetResDir, "mipmap-anydpi-v26")
-        anyDpiDir.mkdirs()
+        val anyDpiDir = File(targetResDir, "mipmap-anydpi-v26").apply { mkdirs() }
         File(anyDpiDir, "ic_launcher.xml").writeText(xml)
         File(anyDpiDir, "ic_launcher_round.xml").writeText(xml)
     }
 
+    private fun generateGlobeBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.TRANSPARENT)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 26f
+        }
+        canvas.drawCircle(256f, 256f, 190f, paint)
+        canvas.drawOval(175f, 66f, 337f, 446f, paint)
+        canvas.drawOval(66f, 175f, 446f, 337f, paint)
+        canvas.drawLine(66f, 256f, 446f, 256f, paint)
+        return bitmap
+    }
+
     private fun saveBitmap(bitmap: Bitmap, file: File) {
+        file.parentFile?.mkdirs()
         FileOutputStream(file).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
