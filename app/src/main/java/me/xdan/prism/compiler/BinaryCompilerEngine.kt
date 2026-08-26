@@ -6,7 +6,6 @@ import net.lingala.zip4j.model.ZipParameters
 import net.lingala.zip4j.model.enums.CompressionMethod
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.file.Files
 
 class BinaryCompilerEngine(private val context: Context) {
 
@@ -19,7 +18,7 @@ class BinaryCompilerEngine(private val context: Context) {
     private val axmlEditor = BinaryXmlEditor()
     private val resTableEditor = ResTableEditor()
     private val zipAligner = ZipAligner()
-    private val apkSignerHelper = ApkSignerHelper()
+    private val apkSignerHelper = ApkSignerHelper(context)
     private val iconPipeline = IconPipeline(context)
 
     fun compile(
@@ -29,57 +28,60 @@ class BinaryCompilerEngine(private val context: Context) {
         targetUrl: String,
         iconInput: IconPipeline.IconInput,
         iconBackgroundColor: String,
-        oldPackageHint: String? = null
+        configJson: String,
+        oldPackageHint: String? = null,
+        oldAppNameHint: String = "Prism Web App"
     ): CompilationResult {
+        var workingDir: File? = null
         try {
-            val workingDir = File(context.cacheDir, "build_${System.currentTimeMillis()}")
-            workingDir.mkdirs()
+            workingDir = File(context.cacheDir, "build_${System.currentTimeMillis()}").apply { mkdirs() }
 
             val baseApkFile = File(workingDir, "base.apk")
             context.assets.open(baseApkAssetPath).use { input ->
-                FileOutputStream(baseApkFile).use { output ->
-                    input.copyTo(output)
-                }
+                FileOutputStream(baseApkFile).use { output -> input.copyTo(output) }
             }
 
-            val extractedDir = File(workingDir, "extracted")
-            extractedDir.mkdirs()
+            val extractedDir = File(workingDir, "extracted").apply { mkdirs() }
             ZipFile(baseApkFile).extractAll(extractedDir.absolutePath)
 
-            // 1. Patch AndroidManifest.xml
             val manifestFile = File(extractedDir, "AndroidManifest.xml")
             if (manifestFile.exists()) {
                 val manifestBytes = manifestFile.readBytes()
-                val patchedManifest = axmlEditor.patchPackageName(manifestBytes, oldPackageHint, targetPackageName)
-                manifestFile.writeBytes(patchedManifest)
+                manifestFile.writeBytes(
+                    axmlEditor.patchStrings(
+                        manifestBytes,
+                        mapOf(
+                            oldPackageHint.orEmpty() to targetPackageName,
+                            oldAppNameHint to targetAppName
+                        ).filterKeys(String::isNotBlank)
+                    )
+                )
             }
 
-            // 2. Patch resources.arsc
             val arscFile = File(extractedDir, "resources.arsc")
             if (arscFile.exists()) {
-                val arscBytes = arscFile.readBytes()
-                val patchedArsc = resTableEditor.patchPackageName(arscBytes, targetPackageName)
-                arscFile.writeBytes(patchedArsc)
+                arscFile.writeBytes(resTableEditor.patchPackageName(arscFile.readBytes(), targetPackageName))
             }
 
-            // 3. Patch Icons
-            val resDir = File(extractedDir, "res")
-            iconPipeline.generateIcons(iconInput, iconBackgroundColor, resDir)
+            File(extractedDir, "assets/prism-config.json").apply {
+                parentFile?.mkdirs()
+                writeText(configJson)
+            }
 
-            // 4. Re-zip
+            iconPipeline.generateIcons(iconInput, iconBackgroundColor, File(extractedDir, "res"))
+
             val unalignedApk = File(workingDir, "unaligned.apk")
-            val zipParameters = ZipParameters()
-            zipParameters.compressionMethod = CompressionMethod.DEFLATE
-            
             val zipFile = ZipFile(unalignedApk)
+            val zipParameters = ZipParameters().apply {
+                compressionMethod = CompressionMethod.DEFLATE
+            }
+
             extractedDir.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
                     zipFile.addFolder(file, zipParameters)
                 } else {
-                    // For resources.arsc and some others, they should be STORED
+                    val storedParams = ZipParameters().apply { compressionMethod = CompressionMethod.STORE }
                     if (file.name == "resources.arsc" || file.name.endsWith(".png")) {
-                        val storedParams = ZipParameters()
-                        storedParams.compressionMethod = CompressionMethod.STORE
                         zipFile.addFile(file, storedParams)
                     } else {
                         zipFile.addFile(file, zipParameters)
@@ -87,22 +89,19 @@ class BinaryCompilerEngine(private val context: Context) {
                 }
             }
 
-            // 5. ZipAlign
             val alignedApk = File(workingDir, "aligned.apk")
             zipAligner.align(unalignedApk, alignedApk)
 
-            // 6. Sign
             val finalApk = File(context.cacheDir, "prism_${System.currentTimeMillis()}.apk")
-            val (keyPair, cert) = apkSignerHelper.generateKeyPairAndCertificate()
-            apkSignerHelper.sign(alignedApk, finalApk, keyPair, cert)
-
-            // Cleanup
-            workingDir.deleteRecursively()
+            val signingCredentials = apkSignerHelper.getOrCreateSigningCredentials()
+            apkSignerHelper.sign(alignedApk, finalApk, signingCredentials.first, signingCredentials.second)
 
             return CompilationResult(success = true, outputApk = finalApk)
         } catch (e: Exception) {
             e.printStackTrace()
             return CompilationResult(success = false, error = e.message ?: e.toString())
+        } finally {
+            workingDir?.deleteRecursively()
         }
     }
 }
