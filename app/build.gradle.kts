@@ -47,7 +47,7 @@ android {
 
 val prepareWebTemplate = tasks.register<PrepareWebTemplateTask>("prepareWebTemplate") {
     dependsOn(":webtemplate:assembleRelease")
-    inputDirectory.set(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release"))
+    inputApk.set(project(":webtemplate").layout.buildDirectory.file("outputs/apk/release/webtemplate-release-unsigned.apk"))
     outputDirectory.set(layout.buildDirectory.dir("generated/prismTemplateAssets"))
 }
 
