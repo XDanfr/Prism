@@ -46,7 +46,13 @@ android {
         }
     }
 
-    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/prismTemplateAssets"))
+    // AGP 9 rejects Provider instances passed directly to the legacy
+    // AndroidSourceSet API. Register the generated directory as a plain path,
+    // while the task dependency below ensures it is populated before assets
+    // are merged.
+    sourceSets["main"].assets.directories.add(
+        layout.buildDirectory.dir("generated/prismTemplateAssets").get().asFile.absolutePath
+    )
 }
 
 val prepareWebTemplate by tasks.registering(Copy::class) {
@@ -98,24 +104,3 @@ dependencies {
     implementation(libs.material)
     implementation(libs.zip4j)
     implementation(libs.bouncycastle)
-    implementation(libs.bcpkix)
-    implementation(libs.apksig)
-    implementation(libs.androidsvg)
-    implementation(libs.moshi.kotlin)
-    implementation(libs.okhttp)
-    implementation(libs.play.services.location)
-    implementation(libs.retrofit)
-    testImplementation(libs.androidx.core)
-    testImplementation(libs.androidx.junit)
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.runner)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    "ksp"(libs.androidx.room.compiler)
-    "ksp"(libs.moshi.kotlin.codegen)
-}
