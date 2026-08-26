@@ -3,6 +3,8 @@ package me.xdan.prism.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +13,7 @@ import kotlinx.coroutines.launch
 import me.xdan.prism.compiler.BinaryCompilerEngine
 import me.xdan.prism.compiler.IconPipeline
 import me.xdan.prism.model.AppConfig
+import me.xdan.prism.util.AppConfigDto
 import me.xdan.prism.util.AppConfigManager
 import me.xdan.prism.util.PackageNameGenerator
 import java.io.File
@@ -20,6 +23,8 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
     private val compiler = BinaryCompilerEngine(application)
     private val context = application
     private val configManager = AppConfigManager(application)
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val configAdapter = moshi.adapter(AppConfigDto::class.java)
 
     private val _uiState = MutableStateFlow<CompilationProgress>(CompilationProgress.Idle)
     val uiState: StateFlow<CompilationProgress> = _uiState.asStateFlow()
@@ -67,14 +72,30 @@ class CreateAppViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 _uiState.value = CompilationProgress.Running("Patching APK…", 0.35f)
+                val configDto = AppConfigDto(
+                    packageName = resolvedConfig.packageName,
+                    targetUrl = resolvedConfig.targetUrl,
+                    appName = resolvedConfig.appName,
+                    iconUri = resolvedConfig.iconUri?.toString(),
+                    faviconUrl = resolvedConfig.faviconUrl,
+                    accentColor = resolvedConfig.accentColor,
+                    accentSource = resolvedConfig.accentSource.name,
+                    navMode = resolvedConfig.navMode.name,
+                    sandboxed = resolvedConfig.sandboxed,
+                    sharedProfileId = resolvedConfig.sharedProfileId,
+                    userScripts = resolvedConfig.userScripts,
+                    blocklists = resolvedConfig.blocklists
+                )
+                val configJson = configAdapter.toJson(configDto)
                 val hexColor = String.format("#%06X", 0xFFFFFF and resolvedConfig.accentColor)
                 val result = compiler.compile(
-                    baseApkAssetPath = "base-release.apk",
+                    baseApkAssetPath = "generated/base-release.apk",
                     targetPackageName = resolvedConfig.packageName,
                     targetAppName = resolvedConfig.appName,
                     targetUrl = resolvedConfig.targetUrl,
                     iconInput = iconInput,
                     iconBackgroundColor = hexColor,
+                    configJson = configJson,
                     oldPackageHint = "me.xdan.prism.template"
                 )
 
