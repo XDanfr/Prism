@@ -1,4 +1,9 @@
-import org.gradle.api.tasks.Copy
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import java.io.File
 
 plugins {
     alias(libs.plugins.android.application)
@@ -45,23 +50,47 @@ android {
             excludes += "/META-INF/NOTICE.md"
         }
     }
-
-    // AGP 9 rejects Provider instances passed directly to the legacy
-    // AndroidSourceSet API. Register the generated directory as a plain path,
-    // while the task dependency below ensures it is populated before assets
-    // are merged.
-    sourceSets["main"].assets.directories.add(
-        layout.buildDirectory.dir("generated/prismTemplateAssets").get().asFile.absolutePath
-    )
 }
 
-val prepareWebTemplate by tasks.registering(Copy::class) {
-    dependsOn(":webtemplate:assembleRelease")
-    from(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release")) {
-        include("*.apk")
+abstract class PrepareWebTemplateTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun copyTemplate() {
+        val sourceApk = project(":webtemplate")
+            .layout.buildDirectory
+            .dir("outputs/apk/release")
+            .get()
+            .asFile
+            .resolve("webtemplate-release.apk")
+            .takeIf { it.exists() }
+            ?: project(":webtemplate")
+                .layout.buildDirectory
+                .dir("outputs/apk/release")
+                .get()
+                .asFile
+                .listFiles()
+                ?.firstOrNull { it.extension == "apk" }
+            ?: error("webtemplate release APK was not produced")
+
+        val target = outputDirectory.get().asFile.resolve("generated/base-release.apk")
+        target.parentFile.mkdirs()
+        sourceApk.copyTo(target, overwrite = true)
     }
-    into(layout.buildDirectory.dir("generated/prismTemplateAssets/generated"))
-    rename { "base-release.apk" }
+}
+
+val prepareWebTemplate = tasks.register<PrepareWebTemplateTask>("prepareWebTemplate") {
+    dependsOn(":webtemplate:assembleRelease")
+    outputDirectory.set(layout.buildDirectory.dir("generated/prismTemplateAssets"))
+}
+
+extensions.configure<ApplicationAndroidComponentsExtension> {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(prepareWebTemplate) {
+            it.outputDirectory
+        }
+    }
 }
 
 tasks.matching { it.name.matches(Regex("merge[A-Z].*Assets")) }.configureEach {
