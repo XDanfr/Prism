@@ -45,6 +45,8 @@ android {
             excludes += "/META-INF/NOTICE.md"
         }
     }
+
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/prismTemplateAssets"))
 }
 
 val prepareWebTemplate by tasks.registering(Copy::class) {
@@ -52,8 +54,12 @@ val prepareWebTemplate by tasks.registering(Copy::class) {
     from(project(":webtemplate").layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
     }
-    into(layout.projectDirectory.dir("src/main/assets/generated"))
+    into(layout.buildDirectory.dir("generated/prismTemplateAssets/generated"))
     rename { "base-release.apk" }
+}
+
+tasks.matching { it.name.matches(Regex("merge[A-Z].*Assets")) }.configureEach {
+    dependsOn(prepareWebTemplate)
 }
 
 tasks.named("preBuild") {
@@ -105,7 +111,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
