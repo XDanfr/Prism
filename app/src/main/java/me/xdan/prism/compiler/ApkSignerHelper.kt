@@ -1,5 +1,6 @@
 package me.xdan.prism.compiler
 
+import android.content.Context
 import com.android.apksig.ApkSigner
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -8,13 +9,23 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.io.File
 import java.math.BigInteger
-import java.security.*
+import java.security.KeyFactory
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.Security
+import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.*
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.Base64
+import java.util.Date
 
-class ApkSignerHelper {
+class ApkSignerHelper(private val context: Context) {
 
     companion object {
+        private const val KEY_ALIAS = "prism-generated"
+        private const val KEY_FILE = "generated-app-signing-key.pk8"
+        private const val CERT_FILE = "generated-app-signing-cert.der"
+
         private val provider = BouncyCastleProvider()
 
         init {
@@ -24,12 +35,7 @@ class ApkSignerHelper {
     }
 
     fun sign(inputApk: File, outputApk: File, keyPair: KeyPair, certificate: X509Certificate) {
-        val signerConfig = ApkSigner.SignerConfig.Builder(
-            "CERT",
-            keyPair.private,
-            listOf(certificate)
-        ).build()
-
+        val signerConfig = ApkSigner.SignerConfig.Builder(KEY_ALIAS, keyPair.private, listOf(certificate)).build()
         ApkSigner.Builder(listOf(signerConfig))
             .setInputApk(inputApk)
             .setOutputApk(outputApk)
@@ -40,16 +46,41 @@ class ApkSignerHelper {
             .sign()
     }
 
-    fun generateKeyPairAndCertificate(): Pair<KeyPair, X509Certificate> {
-        val keyPairGenerator = KeyPairGenerator.getInstance("RSA", provider)
-        keyPairGenerator.initialize(2048)
-        val keyPair = keyPairGenerator.generateKeyPair()
+    fun getOrCreateSigningCredentials(): Pair<KeyPair, X509Certificate> {
+        val keyFile = File(context.noBackupFilesDir, KEY_FILE)
+        val certFile = File(context.noBackupFilesDir, CERT_FILE)
+        if (keyFile.exists() && certFile.exists()) {
+            return runCatching { loadCredentials(keyFile, certFile) }.getOrElse {
+                keyFile.delete()
+                certFile.delete()
+                generateAndStore(keyFile, certFile)
+            }
+        }
+        return generateAndStore(keyFile, certFile)
+    }
 
+    private fun generateAndStore(keyFile: File, certFile: File): Pair<KeyPair, X509Certificate> {
+        val credentials = generateKeyPairAndCertificate()
+        keyFile.writeBytes(credentials.first.private.encoded)
+        certFile.writeBytes(credentials.second.encoded)
+        return credentials
+    }
+
+    private fun loadCredentials(keyFile: File, certFile: File): Pair<KeyPair, X509Certificate> {
+        val keySpec = PKCS8EncodedKeySpec(keyFile.readBytes())
+        val privateKey = KeyFactory.getInstance("RSA", provider).generatePrivate(keySpec)
+        val certificate = CertificateFactory.getInstance("X.509").generateCertificate(certFile.inputStream()) as X509Certificate
+        return KeyPair(certificate.publicKey, privateKey) to certificate
+    }
+
+    private fun generateKeyPairAndCertificate(): Pair<KeyPair, X509Certificate> {
+        val generator = KeyPairGenerator.getInstance("RSA", provider)
+        generator.initialize(2048)
+        val keyPair = generator.generateKeyPair()
         val issuer = X500Name("CN=Prism")
         val serial = BigInteger.valueOf(System.currentTimeMillis())
         val notBefore = Date()
-        val notAfter = Date(notBefore.time + 365L * 24 * 60 * 60 * 1000 * 30) // 30 years
-
+        val notAfter = Date(notBefore.time + 30L * 365 * 24 * 60 * 60 * 1000)
         val builder = JcaX509v3CertificateBuilder(
             issuer,
             serial,
@@ -58,10 +89,12 @@ class ApkSignerHelper {
             issuer,
             keyPair.public
         )
-
-        val contentSigner = JcaContentSignerBuilder("SHA256withRSA").setProvider(provider).build(keyPair.private)
-        val certificate = JcaX509CertificateConverter().setProvider(provider).getCertificate(builder.build(contentSigner))
-
-        return Pair(keyPair, certificate)
+        val signer = JcaContentSignerBuilder("SHA256withRSA")
+            .setProvider(provider)
+            .build(keyPair.private)
+        val certificate = JcaX509CertificateConverter()
+            .setProvider(provider)
+            .getCertificate(builder.build(signer))
+        return keyPair to certificate
     }
 }
