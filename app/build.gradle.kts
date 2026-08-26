@@ -61,6 +61,12 @@ tasks.named("preBuild") {
     dependsOn(prepareWebTemplate)
 }
 
+tasks.configureEach {
+    if (name == "generateDebugAssets" || name == "generateReleaseAssets") {
+        dependsOn(prepareWebTemplate)
+    }
+}
+
 tasks.matching { it.name.matches(Regex("merge[A-Z].*Assets")) }.configureEach {
     dependsOn(prepareWebTemplate)
 }
