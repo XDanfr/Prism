@@ -6,7 +6,11 @@ import java.nio.ByteOrder
 class BinaryXmlEditor {
 
     fun patchPackageName(input: ByteArray, oldPackageHint: String?, newPackage: String): ByteArray =
-        patchStrings(input, mapOfNotNull(oldPackageHint to newPackage))
+        if (oldPackageHint.isNullOrBlank()) {
+            input
+        } else {
+            patchStrings(input, mapOf(oldPackageHint to newPackage))
+        }
 
     fun patchStrings(input: ByteArray, replacements: Map<String, String>): ByteArray {
         if (replacements.isEmpty()) return input
@@ -147,7 +151,4 @@ class BinaryXmlEditor {
             output.add(length.toByte())
         }
     }
-
-    private fun <K, V> mapOfNotNull(key: K?, value: V): Map<K, V> =
-        if (key == null) emptyMap() else mapOf(key to value)
 }
