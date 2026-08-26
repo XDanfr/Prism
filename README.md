@@ -24,6 +24,8 @@
   <i>Placeholder for screenshot</i>
 </p>
 
+# This application does not currently function properly or install web apps. Still a heavy WIP, but the UI is mostly finished.
+
 ## ✨ Features
 
 * **On-Device APK Compilation:** Converts non-PWA sites and web tools directly into standalone Android APKs without relying on any external servers or tools on a PC.
