@@ -41,6 +41,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,7 +98,11 @@ fun CreateScreen(
     var sandboxed by remember { mutableStateOf(true) }
     var sharedProfileId by remember { mutableStateOf<String?>(null) }
     var scripts by remember { mutableStateOf(setOf<String>()) }
+    var scriptUrls by remember { mutableStateOf(emptyList<String>()) }
     var blocklists by remember { mutableStateOf(setOf<String>()) }
+    var blocklistUrls by remember { mutableStateOf(emptyList<String>()) }
+    var customScriptUrl by remember { mutableStateOf("") }
+    var customBlocklistUrl by remember { mutableStateOf("") }
     var nameTouched by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -136,9 +141,7 @@ fun CreateScreen(
                 onValueChange = { value ->
                     url = value
                     if (!nameTouched && appName.isBlank()) {
-                        appName = runCatching {
-                            URI(value).host.orEmpty().removePrefix("www.").substringBefore('.').replaceFirstChar { it.uppercase() }
-                        }.getOrDefault("")
+                        appName = runCatching { URI(value).host.orEmpty().removePrefix("www.").substringBefore('.').replaceFirstChar { it.uppercase() } }.getOrDefault("")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -177,22 +180,12 @@ fun CreateScreen(
                         Column(modifier = Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(if (iconUri != null) "Custom icon selected" else if (faviconUrl != null) "Favicon suggestion" else "Globe fallback")
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { svgPicker.launch("image/svg+xml") }) {
-                                    Icon(Icons.Default.Code, contentDescription = null)
-                                    Text(" SVG")
-                                }
-                                OutlinedButton(onClick = { imagePicker.launch("image/*") }) {
-                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
-                                    Text(" Image")
-                                }
+                                OutlinedButton(onClick = { svgPicker.launch("image/svg+xml") }) { Icon(Icons.Default.Code, contentDescription = null); Text(" SVG") }
+                                OutlinedButton(onClick = { imagePicker.launch("image/*") }) { Icon(Icons.Default.AddPhotoAlternate, contentDescription = null); Text(" Image") }
                             }
                         }
                     }
-                    Text(
-                        if (iconMime == "image/svg+xml") "SVG will be rendered into the adaptive and monochrome layers."
-                        else "PNG/JPEG images are used as the icon artwork. Prism will also generate the monochrome layer.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(if (iconMime == "image/svg+xml") "SVG will be rendered into the adaptive and monochrome layers." else "PNG/JPEG images are used as the icon artwork. Prism will also generate the monochrome layer.", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -201,8 +194,8 @@ fun CreateScreen(
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Accent colour", style = MaterialTheme.typography.titleLarge)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected = accentSource == AccentSource.MATERIAL_YOU, onClick = { accentSource = AccentSource.MATERIAL_YOU }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Material You") }
-                        SegmentedButton(selected = accentSource == AccentSource.CUSTOM, onClick = { accentSource = AccentSource.CUSTOM }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Custom") }
+                        SegmentedButton(selected = accentSource == AccentSource.MATERIAL_YOU, onClick = { accentSource = AccentSource.MATERIAL_YOU }, shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)) { Text("Material You") }
+                        SegmentedButton(selected = accentSource == AccentSource.CUSTOM, onClick = { accentSource = AccentSource.CUSTOM }, shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)) { Text("Custom") }
                     }
                     if (accentSource == AccentSource.MATERIAL_YOU) {
                         Text("Uses the phone's current dynamic primary colour.", style = MaterialTheme.typography.bodySmall)
@@ -219,23 +212,17 @@ fun CreateScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Security, contentDescription = null)
-                        Text("Privacy & navigation", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp))
-                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Security, contentDescription = null); Text("Privacy & navigation", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp)) }
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Sandbox this app")
-                            Text("Keep cookies, local storage and browser data isolated.", style = MaterialTheme.typography.bodySmall)
-                        }
+                        Column(modifier = Modifier.weight(1f)) { Text("Sandbox this app"); Text("Keep cookies, local storage and browser data isolated.", style = MaterialTheme.typography.bodySmall) }
                         Switch(checked = sandboxed, onCheckedChange = { sandboxed = it })
                     }
                     if (!sandboxed) {
                         OutlinedTextField(value = sharedProfileId.orEmpty(), onValueChange = { sharedProfileId = it.ifBlank { null } }, modifier = Modifier.fillMaxWidth(), label = { Text("Shared profile name") }, placeholder = { Text("default") })
                     }
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected = navMode == NavigationMode.WEB_VIEW, onClick = { navMode = NavigationMode.WEB_VIEW }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("WebView") }
-                        SegmentedButton(selected = navMode == NavigationMode.CHROME_CUSTOM_TABS, onClick = { navMode = NavigationMode.CHROME_CUSTOM_TABS }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Custom Tab") }
+                        SegmentedButton(selected = navMode == NavigationMode.WEB_VIEW, onClick = { navMode = NavigationMode.WEB_VIEW }, shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)) { Text("WebView") }
+                        SegmentedButton(selected = navMode == NavigationMode.CHROME_CUSTOM_TABS, onClick = { navMode = NavigationMode.CHROME_CUSTOM_TABS }, shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)) { Text("Custom Tab") }
                     }
                 }
             }
@@ -243,21 +230,18 @@ fun CreateScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Tune, contentDescription = null)
-                        Text("Suggested User Scripts", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp))
-                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Tune, contentDescription = null); Text("User Scripts", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp)) }
                     ScriptOptions.forEach { option ->
-                        FilterChip(
-                            selected = option.id in scripts,
-                            onClick = { scripts = if (option.id in scripts) scripts - option.id else scripts + option.id },
-                            label = { Text(option.title) },
-                            leadingIcon = if (option.id in scripts) ({ Icon(Icons.Default.Security, contentDescription = null) }) else null
-                        )
+                        FilterChip(selected = option.id in scripts, onClick = { scripts = if (option.id in scripts) scripts - option.id else scripts + option.id }, label = { Text(option.title) }, leadingIcon = if (option.id in scripts) ({ Icon(Icons.Default.Security, contentDescription = null) }) else null)
                         Text(option.description, style = MaterialTheme.typography.bodySmall)
                     }
                     HorizontalDivider()
-                    Text("Custom script sources and GreasyFork imports will use the same per-app configuration.", style = MaterialTheme.typography.bodySmall)
+                    Text("Custom source", style = MaterialTheme.typography.titleMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = customScriptUrl, onValueChange = { customScriptUrl = it }, modifier = Modifier.weight(1f), label = { Text("Script URL") }, placeholder = { Text("GreasyFork .user.js URL") }, singleLine = true)
+                        TextButton(onClick = { if (customScriptUrl.startsWith("http://") || customScriptUrl.startsWith("https://")) { scriptUrls = (scriptUrls + customScriptUrl.trim()).distinct(); customScriptUrl = "" } }) { Text("Add") }
+                    }
+                    scriptUrls.forEach { source -> Text("• $source", style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -267,13 +251,17 @@ fun CreateScreen(
                     Text("Ad blocking", style = MaterialTheme.typography.titleLarge)
                     BlocklistOptions.forEach { option ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(option.title)
-                                Text(option.description, style = MaterialTheme.typography.bodySmall)
-                            }
+                            Column(modifier = Modifier.weight(1f)) { Text(option.title); Text(option.description, style = MaterialTheme.typography.bodySmall) }
                             Switch(checked = option.id in blocklists, onCheckedChange = { blocklists = if (option.id in blocklists) blocklists - option.id else blocklists + option.id })
                         }
                     }
+                    HorizontalDivider()
+                    Text("Custom blocklist", style = MaterialTheme.typography.titleMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = customBlocklistUrl, onValueChange = { customBlocklistUrl = it }, modifier = Modifier.weight(1f), label = { Text("Hosts/blocklist URL") }, placeholder = { Text("https://…/hosts.txt") }, singleLine = true)
+                        TextButton(onClick = { if (customBlocklistUrl.startsWith("http://") || customBlocklistUrl.startsWith("https://")) { blocklistUrls = (blocklistUrls + customBlocklistUrl.trim()).distinct(); customBlocklistUrl = "" } }) { Text("Add") }
+                    }
+                    blocklistUrls.forEach { source -> Text("• $source", style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -283,22 +271,22 @@ fun CreateScreen(
             Button(
                 onClick = {
                     val resolvedAccent = if (accentSource == AccentSource.CUSTOM) accentColor else MaterialTheme.colorScheme.primary
-                    onGenerate(
-                        AppConfig(
-                            packageName = packageName,
-                            targetUrl = url.trim(),
-                            appName = appName.trim(),
-                            iconUri = iconUri,
-                            faviconUrl = faviconUrl,
-                            accentColor = resolvedAccent.toArgb(),
-                            accentSource = accentSource,
-                            navMode = navMode,
-                            sandboxed = sandboxed,
-                            sharedProfileId = sharedProfileId,
-                            userScripts = scripts.toList().sorted(),
-                            blocklists = blocklists.toList().sorted()
-                        )
-                    )
+                    onGenerate(AppConfig(
+                        packageName = packageName,
+                        targetUrl = url.trim(),
+                        appName = appName.trim(),
+                        iconUri = iconUri,
+                        faviconUrl = faviconUrl,
+                        accentColor = resolvedAccent.toArgb(),
+                        accentSource = accentSource,
+                        navMode = navMode,
+                        sandboxed = sandboxed,
+                        sharedProfileId = sharedProfileId,
+                        userScripts = scripts.toList().sorted(),
+                        userScriptUrls = scriptUrls,
+                        blocklists = blocklists.toList().sorted(),
+                        blocklistUrls = blocklistUrls
+                    ))
                 },
                 enabled = canBuild,
                 modifier = Modifier.fillMaxWidth().height(60.dp)
