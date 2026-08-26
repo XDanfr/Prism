@@ -104,3 +104,4 @@ dependencies {
     implementation(libs.material)
     implementation(libs.zip4j)
     implementation(libs.bouncycastle)
+}
