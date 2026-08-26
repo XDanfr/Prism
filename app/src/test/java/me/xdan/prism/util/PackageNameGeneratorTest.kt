@@ -24,7 +24,7 @@ class PackageNameGeneratorTest {
     @Test
     fun createsUniqueSuffix() {
         val base = "me.xdan.prism.example"
-        val result = PackageNameGenerator.ensureUnique(base) { it == base || it == "$base2" }
+        val result = PackageNameGenerator.ensureUnique(base) { it == base || it == "${base}2" }
         assertNotEquals(base, result)
         assertEquals("me.xdan.prism.example3", result)
     }
