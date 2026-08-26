@@ -19,5 +19,7 @@ data class AppConfig(
     val sandboxed: Boolean = true,
     val sharedProfileId: String? = null,
     val userScripts: List<String> = emptyList(),
-    val blocklists: List<String> = emptyList()
+    val userScriptUrls: List<String> = emptyList(),
+    val blocklists: List<String> = emptyList(),
+    val blocklistUrls: List<String> = emptyList()
 )
