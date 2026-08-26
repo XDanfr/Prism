@@ -96,4 +96,6 @@ dependencies {
     implementation(libs.bcpkix)
     implementation(libs.apksig)
     implementation(libs.androidsvg)
+
+    testImplementation(libs.junit)
 }
